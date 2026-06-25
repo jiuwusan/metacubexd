@@ -12,6 +12,10 @@ import {
 import { useSortable } from '@vueuse/integrations/useSortable'
 import { checkEndpointAPI } from '~/composables/useApi'
 import { FALLBACK_BACKEND_URL } from '~/constants'
+import {
+  resolveSetupDefaultEndpoint,
+  SETUP_DEFAULT_ENDPOINT,
+} from '~/constants/setupDefaults'
 import { randomUUID, transformEndpointURL } from '~/utils'
 
 definePageMeta({
@@ -25,16 +29,16 @@ const router = useRouter()
 const route = useRoute()
 const endpointStore = useEndpointStore()
 
-const formData = reactive({
-  url: '',
-  secret: '',
+const formData = reactive<{ url: string; secret: string }>({
+  url: SETUP_DEFAULT_ENDPOINT.url,
+  secret: SETUP_DEFAULT_ENDPOINT.secret,
 })
 
 const isSubmitting = ref(false)
 const endpointError = ref<EndpointCheckError>(null)
 
 // Get default backend URL from config
-// Priority: runtime config (NUXT_PUBLIC_DEFAULT_BACKEND_URL) > config.js > fallback
+// Priority: runtime config (NUXT_PUBLIC_DEFAULT_BACKEND_URL) > config.js > bundled setup default
 const runtimeConfig = useRuntimeConfig()
 const defaultBackendURL = computed(() => {
   if (runtimeConfig.public.defaultBackendURL) {
@@ -46,7 +50,7 @@ const defaultBackendURL = computed(() => {
   ) {
     return (window as any).__METACUBEXD_CONFIG__.defaultBackendURL
   }
-  return FALLBACK_BACKEND_URL
+  return SETUP_DEFAULT_ENDPOINT.url
 })
 
 // Get current origin for datalist
@@ -164,11 +168,12 @@ onMounted(async () => {
     }
   }
 
-  // Auto-login with default if no endpoints
+  // Prefill the default endpoint without connecting until the user submits.
   if (endpointStore.endpointList.length === 0) {
-    formData.url = defaultBackendURL.value
-    formData.secret = ''
-    await onSubmit()
+    Object.assign(
+      formData,
+      resolveSetupDefaultEndpoint(defaultBackendURL.value),
+    )
   }
 })
 </script>
