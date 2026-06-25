@@ -176,7 +176,7 @@ export default defineNuxtConfig({
   app: {
     // Use relative paths for assets to support both root and subdirectory deployments
     // Can be overridden with NUXT_APP_BASE_URL environment variable
-    baseURL: process.env.NUXT_APP_BASE_URL || '/',
+    baseURL: process.env.NUXT_APP_BASE_URL || '/metacubexd/',
     head: {
       charset: 'utf-8',
       viewport:
