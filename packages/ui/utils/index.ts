@@ -110,11 +110,14 @@ export function formatBytes(bytes: number) {
 
 // URL helpers
 const URL_PROTOCOL_RE = /^https?:\/\//
+const PROTOCOL_RELATIVE_URL_RE = /^\/\//
 
 export function transformEndpointURL(url: string) {
-  return URL_PROTOCOL_RE.test(url)
-    ? url
-    : `${typeof window !== 'undefined' ? window.location.protocol : 'http:'}//${url}`
+  const protocol =
+    typeof window !== 'undefined' ? window.location.protocol : 'http:'
+  if (URL_PROTOCOL_RE.test(url)) return url
+  if (PROTOCOL_RELATIVE_URL_RE.test(url)) return `${protocol}${url}`
+  return `${protocol}//${url}`
 }
 
 // crypto.randomUUID() is restricted to secure contexts (HTTPS/localhost), so it

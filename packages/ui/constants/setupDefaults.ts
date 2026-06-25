@@ -1,5 +1,5 @@
 export const SETUP_DEFAULT_ENDPOINT = {
-  url: 'http://coding.xinshucredit.com/mihomo',
+  url: '//coding.xinshucredit.com/mihomo',
   secret: 'Xinshu&527',
 } as const
 

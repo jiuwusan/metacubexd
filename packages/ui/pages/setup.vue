@@ -234,9 +234,10 @@ onMounted(async () => {
             <input
               id="url"
               v-model="formData.url"
-              type="url"
+              type="text"
+              inputmode="url"
               class="w-full rounded-lg border border-base-content/15 bg-base-100/80 px-4 py-3 text-[0.9375rem] text-base-content transition-all duration-200 placeholder:text-base-content/40 focus:border-primary focus:ring-3 focus:ring-primary/20 focus:outline-none"
-              placeholder="http(s)://{hostname}:{port}"
+              placeholder="//{hostname}:{port}"
               list="defaultEndpoints"
               autocomplete="on"
             />
