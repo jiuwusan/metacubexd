@@ -137,6 +137,20 @@ git clone https://github.com/metacubex/metacubexd.git -b gh-pages /etc/mihomo/ui
 git -C /etc/mihomo/ui pull -r
 ```
 
+#### Static hosting under `/metacubexd/` (Nginx)
+
+Install dependencies, then build the dashboard with the deployment prefix:
+
+```shell
+pnpm install
+pnpm build:ui:metacubexd
+```
+
+Copy the contents of `packages/ui/.output/public/` to the directory Nginx
+serves at `/metacubexd/` (for example, `/var/www/metacubexd/` with
+`root /var/www`). Redirect `/metacubexd` to `/metacubexd/` so relative asset
+URLs resolve correctly. Open `/metacubexd/` and enter your mihomo endpoint.
+
 #### Standalone hosted-panel container
 
 **`ghcr.io/metacubex/metacubexd`** is another distribution of the hosted-panel
