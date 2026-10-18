@@ -16,6 +16,7 @@ import {
   unfixProxyInGroupAPI,
   updateProxyProviderAPI,
 } from '~/composables/useApi'
+import { useEndpointStore } from './endpoint'
 
 export interface ProxyNodeView {
   name: string
@@ -47,6 +48,8 @@ interface ProxyInfo {
 export const useProxiesStore = defineStore('proxies', () => {
   const configStore = useConfigStore()
   const connectionsStore = useConnectionsStore()
+  const endpointStore = useEndpointStore()
+  let endpointVersion = 0
 
   // State
   const proxies = ref<ProxyWithProvider[]>([])
@@ -66,6 +69,24 @@ export const useProxiesStore = defineStore('proxies', () => {
   // the proxies page's skeleton / empty state so the toolbar no longer floats
   // over a blank void before the first load resolves.
   const proxiesLoaded = ref(false)
+
+  watch(
+    () => endpointStore.selectedEndpoint,
+    () => {
+      endpointVersion++
+      proxies.value = []
+      proxyProviders.value = []
+      latencyMap.value = {}
+      proxyNodeMap.value = {}
+      proxyLatencyTestingMap.value = {}
+      proxyGroupLatencyTestingMap.value = {}
+      proxyProviderLatencyTestingMap.value = {}
+      updatingMap.value = {}
+      isAllProviderUpdating.value = false
+      proxiesLoaded.value = false
+    },
+    { flush: 'sync' },
+  )
 
   // Collapsed map for UI state
   const collapsedMap = useLocalStorage<Record<string, boolean>>(
@@ -302,10 +323,12 @@ export const useProxiesStore = defineStore('proxies', () => {
 
   // Fetch proxies
   const fetchProxiesImpl = async () => {
+    const version = endpointVersion
     const [{ providers }, { proxies: proxiesData }] = await Promise.all([
       fetchProxyProvidersAPI(),
       fetchProxiesAPI(),
     ])
+    if (version !== endpointVersion) return
 
     const proxiesWithTestUrl = Object.values(proxiesData).map((proxy) => {
       if (!proxy.all?.length) return proxy
@@ -352,10 +375,11 @@ export const useProxiesStore = defineStore('proxies', () => {
   // the page can show a skeleton / empty state instead of a blank void. The
   // rejection still propagates to callers exactly as before.
   const fetchProxies = async () => {
+    const version = endpointVersion
     try {
       await fetchProxiesImpl()
     } finally {
-      proxiesLoaded.value = true
+      if (version === endpointVersion) proxiesLoaded.value = true
     }
   }
 
@@ -393,16 +417,22 @@ export const useProxiesStore = defineStore('proxies', () => {
 
   // Select proxy in group
   const selectProxyInGroup = async (proxy: Proxy, proxyName: string) => {
+    const version = endpointVersion
     await selectProxyInGroupAPI(proxy.name, proxyName)
+    if (version !== endpointVersion) return
     await fetchProxies()
+    if (version !== endpointVersion) return
     await closeConnectionsThroughGroup(proxy.name)
   }
 
   // Clear a manual pin on an automatic group (url-test/fallback/load-balance),
   // restoring automatic selection.
   const unfixProxyInGroup = async (groupName: string) => {
+    const version = endpointVersion
     await unfixProxyInGroupAPI(groupName)
+    if (version !== endpointVersion) return
     await fetchProxies()
+    if (version !== endpointVersion) return
     await closeConnectionsThroughGroup(groupName)
   }
 
@@ -541,6 +571,7 @@ export const useProxiesStore = defineStore('proxies', () => {
     testUrl: string | null,
     timeout: number | null,
   ) => {
+    const version = endpointVersion
     const nodeName = getNowProxyNodeName(proxyName)
     const finalTestUrl = normalizeLatencyTestUrl(testUrl)
     const nodeRecommendationStore = useNodeRecommendationStore()
@@ -556,6 +587,7 @@ export const useProxiesStore = defineStore('proxies', () => {
         finalTestUrl,
         timeout ?? configStore.latencyTestTimeoutDuration,
       )
+      if (version !== endpointVersion) return
 
       recordLatencyTestResult(nodeName, finalTestUrl, delay)
       appendLatencyHistoryEntry(nodeName, finalTestUrl, delay)
@@ -565,6 +597,7 @@ export const useProxiesStore = defineStore('proxies', () => {
         delay > 0,
       )
     } catch {
+      if (version !== endpointVersion) return
       // Transport failure (timeout/network): leave latencyMap untouched so the
       // pill keeps showing the last known value. Record a failure datapoint
       // so the stability bar / sparkline still reflect the failed attempt.
@@ -575,12 +608,14 @@ export const useProxiesStore = defineStore('proxies', () => {
       )
       nodeRecommendationStore.recordTestResult(nodeName, null, false)
     } finally {
-      proxyLatencyTestingMap.value[nodeName] = false
+      if (version === endpointVersion)
+        proxyLatencyTestingMap.value[nodeName] = false
     }
   }
 
   // Proxy group latency test
   const proxyGroupLatencyTest = async (proxyGroupName: string) => {
+    const version = endpointVersion
     const nodeRecommendationStore = useNodeRecommendationStore()
     proxyGroupLatencyTestingMap.value[proxyGroupName] = true
 
@@ -598,10 +633,13 @@ export const useProxiesStore = defineStore('proxies', () => {
         finalTestUrl,
         currentProxyGroup?.timeout ?? configStore.latencyTestTimeoutDuration,
       )
+      if (version !== endpointVersion) return
       await fetchProxies()
+      if (version !== endpointVersion) return
       recordLatencyTestResults(results, finalTestUrl)
       nodeRecommendationStore.recordBatchResults(results)
     } catch {
+      if (version !== endpointVersion) return
       // Transport failure: leave latencyMap untouched (pills keep their last
       // known values) and only record failure datapoints in history /
       // recommendation so the bar/sparkline reflect the failed attempt.
@@ -615,12 +653,14 @@ export const useProxiesStore = defineStore('proxies', () => {
       }
       nodeRecommendationStore.recordBatchResults(failedResults)
     } finally {
-      proxyGroupLatencyTestingMap.value[proxyGroupName] = false
+      if (version === endpointVersion)
+        proxyGroupLatencyTestingMap.value[proxyGroupName] = false
     }
   }
 
   // Update provider
   const updateProviderByProviderName = async (providerName: string) => {
+    const version = endpointVersion
     updatingMap.value[providerName] = true
 
     try {
@@ -629,15 +669,18 @@ export const useProxiesStore = defineStore('proxies', () => {
       /* empty */
     }
 
+    if (version !== endpointVersion) return
+
     try {
       await fetchProxies()
     } finally {
-      updatingMap.value[providerName] = false
+      if (version === endpointVersion) updatingMap.value[providerName] = false
     }
   }
 
   // Update all providers
   const updateAllProvider = async () => {
+    const version = endpointVersion
     isAllProviderUpdating.value = true
 
     try {
@@ -646,9 +689,10 @@ export const useProxiesStore = defineStore('proxies', () => {
           updateProxyProviderAPI(provider.name),
         ),
       )
+      if (version !== endpointVersion) return
       await fetchProxies()
     } finally {
-      isAllProviderUpdating.value = false
+      if (version === endpointVersion) isAllProviderUpdating.value = false
     }
   }
 
@@ -656,6 +700,7 @@ export const useProxiesStore = defineStore('proxies', () => {
 
   // Proxy provider latency test
   const proxyProviderLatencyTest = async (providerName: string) => {
+    const version = endpointVersion
     const nodeRecommendationStore = useNodeRecommendationStore()
     proxyProviderLatencyTestingMap.value[providerName] = true
 
@@ -673,6 +718,7 @@ export const useProxiesStore = defineStore('proxies', () => {
         i < memberNames.length;
         i += PROVIDER_LATENCY_BATCH_SIZE
       ) {
+        if (version !== endpointVersion) return
         const batch = memberNames.slice(i, i + PROVIDER_LATENCY_BATCH_SIZE)
         await Promise.all(
           batch.map(async (memberName) => {
@@ -684,6 +730,7 @@ export const useProxiesStore = defineStore('proxies', () => {
                 finalTestUrl,
                 timeout,
               )
+              if (version !== endpointVersion) return
               results[nodeName] = delay
               recordLatencyTestResult(nodeName, finalTestUrl, delay)
               appendLatencyHistoryEntry(nodeName, finalTestUrl, delay)
@@ -693,6 +740,7 @@ export const useProxiesStore = defineStore('proxies', () => {
                 delay > 0,
               )
             } catch {
+              if (version !== endpointVersion) return
               const failedDelay = configStore.latencyQualityMap.NOT_CONNECTED
               results[nodeName] = failedDelay
               appendLatencyHistoryEntry(nodeName, finalTestUrl, failedDelay)
@@ -702,14 +750,18 @@ export const useProxiesStore = defineStore('proxies', () => {
         )
       }
 
+      if (version !== endpointVersion) return
+
       try {
         await fetchProxies()
       } catch {
         /* best-effort refresh */
       }
-      nodeRecommendationStore.recordBatchResults(results)
+      if (version === endpointVersion)
+        nodeRecommendationStore.recordBatchResults(results)
     } finally {
-      proxyProviderLatencyTestingMap.value[providerName] = false
+      if (version === endpointVersion)
+        proxyProviderLatencyTestingMap.value[providerName] = false
     }
   }
 

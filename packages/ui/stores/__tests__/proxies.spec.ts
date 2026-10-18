@@ -2,6 +2,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { useProxiesStore } from '../proxies'
+import { useEndpointStore } from '../endpoint'
 
 const apiMocks = vi.hoisted(() => ({
   fetchProxyProvidersAPI: vi.fn(),
@@ -75,6 +76,71 @@ describe('stores/proxies latency state', () => {
     recordTestResultMock.mockReset()
     recordBatchResultsMock.mockReset()
     apiMocks.fetchProxyProvidersAPI.mockResolvedValue({ providers: {} })
+  })
+
+  it('clears backend-specific proxy data when switching endpoints', async () => {
+    const endpoints = useEndpointStore()
+    endpoints.setSelectedEndpoint('home')
+    apiMocks.fetchProxiesAPI.mockResolvedValue({
+      proxies: {
+        Home: proxy({ name: 'Home', type: 'Selector', all: ['node-a'] }),
+      },
+    })
+    const store = useProxiesStore()
+    await store.fetchProxies()
+    expect(store.proxies).toHaveLength(1)
+
+    endpoints.setSelectedEndpoint('office')
+
+    expect(store.proxies).toEqual([])
+    expect(store.proxyProviders).toEqual([])
+    expect(store.proxiesLoaded).toBe(false)
+    expect(store.isProxyGroup('Home')).toBe(false)
+  })
+
+  it('does not apply proxy responses from a backend that is no longer selected', async () => {
+    const endpoints = useEndpointStore()
+    endpoints.setSelectedEndpoint('home')
+    let finish!: (data: {
+      proxies: Record<string, ReturnType<typeof proxy>>
+    }) => void
+    apiMocks.fetchProxiesAPI.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    const store = useProxiesStore()
+    const fetching = store.fetchProxies()
+    endpoints.setSelectedEndpoint('office')
+    finish({
+      proxies: {
+        Home: proxy({ name: 'Home', type: 'Selector', all: ['node-a'] }),
+      },
+    })
+    await fetching
+
+    expect(store.proxies).toEqual([])
+    expect(store.proxiesLoaded).toBe(false)
+  })
+
+  it('ignores latency results that arrive after switching backends', async () => {
+    const endpoints = useEndpointStore()
+    endpoints.setSelectedEndpoint('home')
+    let finish!: (data: { delay: number }) => void
+    apiMocks.proxyLatencyTestAPI.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finish = resolve
+      }),
+    )
+    const store = useProxiesStore()
+    const testing = store.proxyLatencyTest('node-a', '', null, null)
+    endpoints.setSelectedEndpoint('office')
+    finish({ delay: 42 })
+    await testing
+
+    expect(store.getLatencyByName('node-a', null)).toBe(0)
+    expect(recordTestResultMock).not.toHaveBeenCalled()
+    expect(store.proxyLatencyTestingMap).toEqual({})
   })
 
   it('dedupes group members so two providers contributing the same node name collapse to one entry', async () => {

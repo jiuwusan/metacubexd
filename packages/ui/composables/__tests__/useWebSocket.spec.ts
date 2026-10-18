@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { effectScope } from 'vue'
+import { effectScope, reactive } from 'vue'
 import { useBackendWebSocket } from '../useWebSocket'
 
 const mockUseMockMode = vi.fn()
@@ -30,12 +30,15 @@ class MockWebSocket {
   }
 }
 
-const mockEndpointStore = {
+const mockEndpointStore = reactive<{
+  currentEndpoint: { secret: string; label?: string }
+  wsEndpointURL: string
+}>({
   currentEndpoint: {
     secret: 'secret',
   },
   wsEndpointURL: 'ws://localhost:9090',
-}
+})
 
 const mockConnectionsStore = {
   updateFromWsMsg: vi.fn(),
@@ -47,10 +50,12 @@ const mockGlobalStore = {
   addTrafficDataPoint: vi.fn(),
   addMemoryDataPoint: vi.fn(),
   addConnectionCountDataPoint: vi.fn(),
+  clearChartHistory: vi.fn(),
 }
 
 const mockLogsStore = {
   addLog: vi.fn(),
+  clearLogs: vi.fn(),
 }
 
 const mockConfigStore = {
@@ -102,6 +107,54 @@ describe('composables/useWebSocket', () => {
       expect(socket.close).toHaveBeenCalledTimes(1)
     }
     expect(MockWebSocket.instances).toHaveLength(8)
+  })
+
+  it('reconnects to a new backend without leaving old sockets or realtime data active', () => {
+    const scope = effectScope()
+    try {
+      scope.run(() => useBackendWebSocket().connect())
+      const oldSockets = [...MockWebSocket.instances]
+      mockEndpointStore.wsEndpointURL = 'wss://office.example/mihomo'
+      mockEndpointStore.currentEndpoint = { secret: 'office-secret' }
+
+      expect(
+        MockWebSocket.instances.slice(4).map((socket) => socket.url),
+      ).toEqual([
+        'wss://office.example/mihomo/connections?token=office-secret',
+        'wss://office.example/mihomo/traffic?token=office-secret',
+        'wss://office.example/mihomo/memory?token=office-secret',
+        'wss://office.example/mihomo/logs?token=office-secret&level=info',
+      ])
+      for (const socket of oldSockets) {
+        expect(socket.close).toHaveBeenCalledOnce()
+        expect(socket.onmessage).toBeNull()
+        expect(socket.onclose).toBeNull()
+      }
+      expect(mockGlobalStore.setLatestTraffic).toHaveBeenCalledWith(null)
+      expect(mockGlobalStore.setLatestMemory).toHaveBeenCalledWith(null)
+      expect(mockGlobalStore.clearChartHistory).toHaveBeenCalledOnce()
+      expect(mockLogsStore.clearLogs).toHaveBeenCalledOnce()
+    } finally {
+      scope.stop()
+      mockEndpointStore.wsEndpointURL = 'ws://localhost:9090'
+      mockEndpointStore.currentEndpoint = { secret: 'secret' }
+    }
+  })
+
+  it('keeps sockets and live data when only the current backend label changes', () => {
+    const scope = effectScope()
+    try {
+      scope.run(() => useBackendWebSocket().connect())
+      const sockets = [...MockWebSocket.instances]
+      mockEndpointStore.currentEndpoint = { secret: 'secret', label: 'Renamed' }
+
+      expect(MockWebSocket.instances).toHaveLength(4)
+      for (const socket of sockets) expect(socket.close).not.toHaveBeenCalled()
+      expect(mockLogsStore.clearLogs).not.toHaveBeenCalled()
+      expect(mockGlobalStore.clearChartHistory).not.toHaveBeenCalled()
+    } finally {
+      scope.stop()
+    }
   })
 
   it('closes sockets when the owning effect scope is disposed', () => {

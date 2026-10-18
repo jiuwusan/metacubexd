@@ -327,7 +327,12 @@ export const useConnectionsStore = defineStore('connections', () => {
       lastUploadTotal = 0
       lastDownloadTotal = 0
       connectionLastData.clear()
+      allConnections.value = []
+      activeConnections.value = []
+      closedConnections.value = []
+      latestConnectionMsg.value = null
     },
+    { flush: 'sync' },
   )
 
   return {

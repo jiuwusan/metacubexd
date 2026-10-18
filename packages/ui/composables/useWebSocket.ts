@@ -1,5 +1,5 @@
 import type { Log, MemoryData, TrafficData, WsMsg } from '~/types'
-import { getCurrentScope, onScopeDispose } from 'vue'
+import { getCurrentScope, onScopeDispose, watch } from 'vue'
 import { useMockMode } from './useApi'
 import { useMockData } from './useMockData'
 
@@ -34,6 +34,7 @@ export function useBackendWebSocket() {
 
   // Auto-reconnect bookkeeping
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let sessionActive = false
 
   // Close a socket WITHOUT triggering its auto-reconnect handler. Used for
   // intentional teardown (reconnect, unmount), so we don't reconnect a socket
@@ -41,6 +42,8 @@ export function useBackendWebSocket() {
   const closeWs = (ws: WebSocket | null) => {
     if (!ws) return
     ws.onclose = null
+    ws.onmessage = null
+    ws.onerror = null
     ws.close()
   }
 
@@ -96,6 +99,7 @@ export function useBackendWebSocket() {
   // Connect to all WebSocket endpoints
   const connect = () => {
     disconnect()
+    sessionActive = true
 
     // In mock mode, use mock data instead of WebSocket
     if (useMockMode()) {
@@ -218,6 +222,7 @@ export function useBackendWebSocket() {
 
   // Disconnect all WebSockets
   const disconnect = () => {
+    sessionActive = false
     // Cancel any pending reconnect — this is an intentional teardown.
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
@@ -277,6 +282,23 @@ export function useBackendWebSocket() {
   }
 
   if (getCurrentScope()) {
+    watch(
+      [
+        () => endpointStore.currentEndpoint?.id,
+        () => endpointStore.currentEndpoint?.url,
+        () => endpointStore.currentEndpoint?.secret,
+      ],
+      () => {
+        const reconnect = sessionActive
+        disconnect()
+        logsStore.clearLogs()
+        globalStore.setLatestTraffic(null)
+        globalStore.setLatestMemory(null)
+        globalStore.clearChartHistory()
+        if (reconnect) connect()
+      },
+      { flush: 'sync' },
+    )
     onScopeDispose(disconnect)
   }
 

@@ -101,4 +101,19 @@ describe('stores/connections restart detection vs endpoint switch', () => {
     expect(dbMock.clearAll).toHaveBeenCalled()
     expect(mockGlobalStore.clearChartHistory).toHaveBeenCalled()
   })
+
+  it('clears the previous backend connection list without deleting usage history', async () => {
+    const store = useConnectionsStore()
+    store.updateFromWsMsg(makeMsg(1000, 2000, [makeConn('home', 500, 1000)]))
+    expect(store.activeConnections).toHaveLength(1)
+
+    mockEndpointStore.selectedEndpoint = 'endpoint-b'
+    await nextTick()
+
+    expect(store.allConnections).toEqual([])
+    expect(store.activeConnections).toEqual([])
+    expect(store.closedConnections).toEqual([])
+    expect(store.latestConnectionMsg).toBeNull()
+    expect(dbMock.clearAll).not.toHaveBeenCalled()
+  })
 })

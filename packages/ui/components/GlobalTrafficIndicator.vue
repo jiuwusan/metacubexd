@@ -451,7 +451,7 @@ onBeforeUnmount(() => {
   <Teleport v-if="headerTargetExists" to="#header-traffic-indicator">
     <div
       v-if="isVisible && isCollapsed && globalStore.latestTraffic"
-      class="flex cursor-pointer items-center gap-2 rounded-lg bg-[color-mix(in_oklab,var(--color-base-100)_50%,transparent)] px-2 py-1 transition-[background] duration-200 ease-in-out hover:bg-[var(--color-base-100)]"
+      class="flex cursor-pointer items-center gap-2 rounded-lg bg-[color-mix(in_oklab,var(--color-base-100)_50%,transparent)] px-2 py-1 transition-[background] duration-200 ease-in-out hover:bg-[var(--color-base-100)] max-sm:flex-col max-sm:gap-0"
       @click="expandFromHeader"
     >
       <div class="flex items-center gap-1">
@@ -461,7 +461,7 @@ onBeforeUnmount(() => {
         >
       </div>
       <div
-        class="h-3 w-px bg-[color-mix(in_oklab,var(--color-base-content)_20%,transparent)]"
+        class="h-3 w-px bg-[color-mix(in_oklab,var(--color-base-content)_20%,transparent)] max-sm:hidden"
       />
       <div class="flex items-center gap-1">
         <IconArrowUp class="size-3 shrink-0 text-[var(--color-info)]" />

@@ -4,6 +4,7 @@ import { autoUpdate, flip, offset, shift, useFloating } from '@floating-ui/vue'
 import {
   IconBolt,
   IconChartAreaLine,
+  IconChevronDown,
   IconChevronsLeft,
   IconChevronsRight,
   IconFileCode,
@@ -18,6 +19,7 @@ import {
   IconRuler,
   IconServerCog,
   IconSettings,
+  IconSwitchHorizontal,
 } from '@tabler/icons-vue'
 import { toast } from 'vue-sonner'
 import { useMenuKeyboard } from '~/composables/useMenuKeyboard'
@@ -30,6 +32,18 @@ import { orderProxyModes } from '~/utils'
 const route = useRoute()
 const { t } = useI18n()
 const configStore = useConfigStore()
+const endpointStore = useEndpointStore()
+const { open: openEndpointSwitcher } = useEndpointSwitcher()
+const endpointLabel = computed(() => {
+  const endpoint = endpointStore.currentEndpoint
+  if (!endpoint) return t('switchEndpoint')
+  if (endpoint.label) return endpoint.label
+  try {
+    return new URL(endpoint.url).host
+  } catch {
+    return endpoint.url
+  }
+})
 const { hasAgent, hasFeature } = useControlInfo()
 const configActions = useConfigActions()
 
@@ -228,10 +242,18 @@ async function onRestartCore() {
           <IconMenu2 class="h-5 w-5" />
         </label>
 
-        <!-- Logo -->
-        <div class="min-w-0 shrink">
-          <LogoText />
-        </div>
+        <LogoText class="shrink-0" />
+        <button
+          type="button"
+          class="flex h-11 shrink-0 items-center gap-1 rounded-lg px-1 text-sm font-medium hover:bg-[var(--sidebar-hover)]"
+          :title="endpointStore.currentEndpoint?.url"
+          :aria-label="`${t('switchEndpoint')}: ${endpointLabel}`"
+          aria-haspopup="dialog"
+          @click="openEndpointSwitcher"
+        >
+          <span>{{ t('switchEndpointShort') }}</span>
+          <IconChevronDown class="h-4 w-4 shrink-0 text-base-content/60" />
+        </button>
 
         <!-- Right side controls -->
         <div class="ml-auto flex shrink-0 items-center gap-1">
@@ -302,6 +324,21 @@ async function onRestartCore() {
             <span :class="configStore.sidebarExpanded ? '' : 'lg:hidden'">
               {{ t('collapse') }}
             </span>
+          </button>
+
+          <button
+            type="button"
+            class="press-tactile hidden h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[var(--sidebar-border)] bg-transparent text-sm text-base-content hover:bg-[var(--sidebar-hover)] lg:flex"
+            :class="configStore.sidebarExpanded ? 'w-full' : 'w-9 self-center'"
+            :title="`${t('switchEndpoint')}: ${endpointLabel}`"
+            :aria-label="`${t('switchEndpoint')}: ${endpointLabel}`"
+            aria-haspopup="dialog"
+            @click="openEndpointSwitcher"
+          >
+            <IconSwitchHorizontal class="h-5 w-5 shrink-0" />
+            <span v-if="configStore.sidebarExpanded">{{
+              t('switchEndpointShort')
+            }}</span>
           </button>
 
           <!-- Running mode switcher -->

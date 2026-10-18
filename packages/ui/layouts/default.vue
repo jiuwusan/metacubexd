@@ -100,7 +100,7 @@ const hasEndpoint = computed(
     <!-- Sidebar + page content fill the height below the title bar. -->
     <div class="relative flex min-h-0 flex-1 flex-col">
       <Sidebar>
-        <slot />
+        <slot :key="endpointStore.selectedEndpoint" />
       </Sidebar>
     </div>
 
@@ -111,7 +111,12 @@ const hasEndpoint = computed(
     <ProtectedResources v-if="hasEndpoint" />
 
     <!-- Global traffic indicator -->
-    <GlobalTrafficIndicator v-if="hasEndpoint" />
+    <GlobalTrafficIndicator
+      v-if="hasEndpoint"
+      :key="endpointStore.selectedEndpoint"
+    />
+
+    <EndpointSwitcher />
 
     <!-- Keyboard shortcuts help modal -->
     <ShortcutsHelpModal />

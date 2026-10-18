@@ -2,7 +2,7 @@
 import { useVersionQuery } from '~/composables/useQueries'
 
 const { t } = useI18n()
-const router = useRouter()
+const { open: openEndpointSwitcher } = useEndpointSwitcher()
 const endpointStore = useEndpointStore()
 const kernelStore = useKernelStore()
 const { isDesktop, isMac } = useDesktop()
@@ -32,8 +32,7 @@ const showBanner = computed(() => {
 const isMacDesktop = isDesktop && isMac
 
 function switchEndpoint() {
-  endpointStore.setSelectedEndpoint('')
-  router.push('/setup')
+  openEndpointSwitcher()
 }
 </script>
 
@@ -71,7 +70,7 @@ function switchEndpoint() {
       </div>
       <div class="flex shrink-0 items-center gap-2">
         <button
-          class="btn text-error-content btn-ghost btn-xs hover:bg-error-content/20"
+          class="btn btn-ghost text-error-content btn-xs hover:bg-error-content/20"
           :disabled="isFetching"
           @click="() => refetch()"
         >

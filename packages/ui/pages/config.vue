@@ -13,9 +13,9 @@ const { t } = useI18n()
 const nodeRecommendationStore = useNodeRecommendationStore()
 
 useHead({ title: computed(() => t('config')) })
-const router = useRouter()
 const configStore = useConfigStore()
 const endpointStore = useEndpointStore()
+const { open: openEndpointSwitcher } = useEndpointSwitcher()
 const proxiesStore = useProxiesStore()
 
 const configActions = useConfigActions()
@@ -241,8 +241,7 @@ function getModeLabel(mode: string) {
 }
 
 function switchEndpoint() {
-  endpointStore.setSelectedEndpoint('')
-  router.push('/setup')
+  openEndpointSwitcher()
 }
 
 const isLoading = computed(

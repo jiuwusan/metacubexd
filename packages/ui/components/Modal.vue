@@ -93,7 +93,7 @@ defineExpose({ open, close })
     @cancel.prevent="requestClose"
   >
     <div
-      class="modal-shell flex max-h-[90vh] w-[95%] flex-col overflow-hidden rounded-2xl p-0 sm:w-11/12"
+      class="modal-shell flex max-h-[90vh] w-[95%] flex-col justify-self-center overflow-hidden rounded-2xl p-0 max-sm:mb-[max(1rem,env(safe-area-inset-bottom))] sm:w-11/12"
       :class="[isOpen ? 'is-open' : '', modalSizeClass]"
       :style="{
         background: 'var(--color-base-100)',

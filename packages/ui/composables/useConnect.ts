@@ -13,6 +13,7 @@ export function useConnect() {
 
   const endpointError = ref<EndpointCheckError>(null)
   const isSubmitting = ref(false)
+  let selectionVersion = 0
 
   // Live state of the automatic default-backend probe, surfaced as an
   // instrument-style status readout on the connect form.
@@ -92,25 +93,47 @@ export function useConnect() {
     }
   }
 
+  function cancelSelection() {
+    selectionVersion++
+    isSubmitting.value = false
+    endpointError.value = null
+  }
+
   // Re-probe an already-saved endpoint, then select + navigate on success.
-  async function selectEndpoint(id: string): Promise<boolean> {
+  async function selectEndpoint(
+    id: string,
+    options: { preserveRoute?: boolean } = {},
+  ): Promise<boolean> {
+    cancelSelection()
+    const version = selectionVersion
     const endpoint = endpointStore.endpointList.find((e) => e.id === id)
     if (!endpoint) return false
+    const { url, secret } = endpoint
+    const previousEndpoint = endpointStore.selectedEndpoint
 
     // Surface the re-probe on the shared status readout (statusConnecting)
     // instead of leaving it reading "idle" during the up-to-5s check.
     isSubmitting.value = true
     endpointError.value = null
     try {
-      const error = await checkEndpointAPI(endpoint.url, endpoint.secret)
+      const error = await checkEndpointAPI(url, secret)
+      const savedEndpoint = endpointStore.endpointList.find((e) => e.id === id)
+      if (
+        version !== selectionVersion ||
+        endpointStore.selectedEndpoint !== previousEndpoint ||
+        savedEndpoint?.url !== url ||
+        savedEndpoint?.secret !== secret
+      )
+        return false
       if (error) {
         endpointError.value = error
         return false
       }
-      onSuccess(id)
+      if (options.preserveRoute) endpointStore.setSelectedEndpoint(id)
+      else onSuccess(id)
       return true
     } finally {
-      isSubmitting.value = false
+      if (version === selectionVersion) isSubmitting.value = false
     }
   }
 
@@ -172,6 +195,7 @@ export function useConnect() {
     defaultBackendURL,
     connect,
     selectEndpoint,
+    cancelSelection,
     autoLogin,
   }
 }
